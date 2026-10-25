@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Menu, Coins, Leaf, Search, Bell, User, ChevronDown, LogIn } from "lucide-react"
 import {
@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { IProvider } from "@web3auth/base"
+import type { IProvider } from "@web3auth/modal"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { createUser, getUnreadNotifications, markNotificationAsRead, getUserByEmail, getUserBalance } from "@/utils/db/actions"
 import { Skeleton } from "./ui/skeleton"
@@ -45,6 +45,7 @@ export default function Header({ onMenuClick, totalEarnings }: HeaderProps) {
 
   const isMobile = useMediaQuery("(max-width: 768px)");
   const pathname = usePathname();
+  const router = useRouter();
 
   // Use the auth status hook
   const { isLoggedIn, userEmail, isLoading } = useAuthStatus();
@@ -93,8 +94,8 @@ export default function Header({ onMenuClick, totalEarnings }: HeaderProps) {
         await initWeb3Auth();
         const web3auth = getWeb3AuthInstance();
 
-        if (web3auth?.provider) {
-          setProvider(web3auth.provider);
+        if (web3auth?.connection?.ethereumProvider) {
+          setProvider(web3auth.connection?.ethereumProvider ?? null);
         }
       } catch (error) {
         console.error("Error initializing Web3Auth:", error);
@@ -160,6 +161,7 @@ export default function Header({ onMenuClick, totalEarnings }: HeaderProps) {
         .replace(/^ +/, "")
         .replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
     });
+    window.dispatchEvent(new Event('authChanged'));
   }, []);
 
   const login = useCallback(async () => {
@@ -177,7 +179,8 @@ export default function Header({ onMenuClick, totalEarnings }: HeaderProps) {
     setLoggingOut(true);
 
     try {
-      const web3authProvider = await web3auth.connect();
+      const connection = await web3auth.connect();
+      const web3authProvider = connection?.ethereumProvider ?? null;
       const userInfo = await web3auth.getUserInfo();
 
       setProvider(web3authProvider);
@@ -185,6 +188,7 @@ export default function Header({ onMenuClick, totalEarnings }: HeaderProps) {
       if (userInfo.email) {
         localStorage.setItem('userEmail', userInfo.email);
         localStorage.setItem('isLoggedIn', 'true');
+        window.dispatchEvent(new Event('authChanged'));
 
         try {
           let existingUser = await getUserByEmail(userInfo.email);
@@ -213,6 +217,7 @@ export default function Header({ onMenuClick, totalEarnings }: HeaderProps) {
       });
 
       setAuthModalOpen(false);
+      router.refresh();
     } catch (error) {
       console.error("Error during login:", error);
       toast({
@@ -223,9 +228,10 @@ export default function Header({ onMenuClick, totalEarnings }: HeaderProps) {
     } finally {
       setLoggingOut(false);
     }
-  }, [toast, fetchUserData]);
+  }, [toast, fetchUserData, router]);
 
   const logout = useCallback(async () => {
+    if (loggingOut) return;
     const web3auth = getWeb3AuthInstance();
     setLoggingOut(true);
 
@@ -249,6 +255,8 @@ export default function Header({ onMenuClick, totalEarnings }: HeaderProps) {
         description: "Logged out successfully",
         variant: "default",
       });
+      router.push('/');
+      router.refresh();
     } catch (error) {
       console.error("Error during logout:", error);
       toast({
@@ -259,7 +267,7 @@ export default function Header({ onMenuClick, totalEarnings }: HeaderProps) {
     } finally {
       setLoggingOut(false);
     }
-  }, [clearAuthData, toast]);
+  }, [clearAuthData, toast, router, loggingOut]);
 
   const handleNotificationClick = useCallback(async (notificationId: number) => {
     try {
@@ -280,7 +288,9 @@ export default function Header({ onMenuClick, totalEarnings }: HeaderProps) {
   const handleAuthSuccess = useCallback((userData: any) => {
     localStorage.setItem('userEmail', userData.email);
     localStorage.setItem('isLoggedIn', 'true');
-  }, []);
+    window.dispatchEvent(new Event('authChanged'));
+    router.refresh();
+  }, [router]);
 
   const NotificationDropdown = useMemo(() => (
     <DropdownMenu>

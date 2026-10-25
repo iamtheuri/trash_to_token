@@ -40,7 +40,7 @@ export function useAuthStatus(
         web3AuthConnected = true;
         try {
           web3AuthUser = await web3auth.getUserInfo();
-          web3AuthProvider = web3auth.provider;
+          web3AuthProvider = web3auth.connection?.ethereumProvider ?? null;
         } catch (error) {
           console.error("Error getting Web3Auth user info:", error);
         }
@@ -102,6 +102,8 @@ export function useAuthStatus(
       }
     };
     window.addEventListener("storage", storageListener);
+    // "storage" only fires in other tabs, so same-tab changes use this event
+    window.addEventListener("authChanged", onAuthChange);
 
     return () => {
       if (web3auth) {
@@ -109,6 +111,7 @@ export function useAuthStatus(
         web3auth.off("disconnected", onAuthChange);
       }
       window.removeEventListener("storage", storageListener);
+      window.removeEventListener("authChanged", onAuthChange);
     };
   }, [checkAuthStatus, debugMode, refreshCounter]);
 

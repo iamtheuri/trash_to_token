@@ -1,8 +1,7 @@
 // @ts-nocheck
 "use client";
-import { Web3Auth } from "@web3auth/modal";
-import { CHAIN_NAMESPACES, WEB3AUTH_NETWORK } from "@web3auth/base";
-import { EthereumPrivateKeyProvider } from "@web3auth/ethereum-provider";
+import { Web3Auth, WEB3AUTH_NETWORK, fromViemChain } from "@web3auth/modal";
+import { sepolia } from "viem/chains";
 
 // Prevent multiple instances during hot module reloading in development
 let web3authInstance: Web3Auth | null = null;
@@ -25,38 +24,23 @@ export function getWeb3AuthInstance(): Web3Auth | null {
     return null;
   }
 
-  const chainConfig = {
-    chainNamespace: CHAIN_NAMESPACES.EIP155,
-    chainId: "0xaa36a7",
-    rpcTarget: `https://rpc.ankr.com/eth_sepolia/${process.env.NEXT_PUBLIC_ETH_SEPOLIA_API_KEY}`,
-    displayName: "Ethereum Sepolia Testnet",
-    blockExplorerUrl: "https://sepolia.etherscan.io",
-    ticker: "ETH",
-    tickerName: "Ethereum",
-    logo: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
-  };
-
-  const privateKeyProvider = new EthereumPrivateKeyProvider({
-    config: { chainConfig },
-  });
+  const rpcKey = process.env.NEXT_PUBLIC_ETH_SEPOLIA_API_KEY;
+  const chain = fromViemChain(sepolia);
+  if (rpcKey) {
+    chain.rpcTarget = `https://rpc.ankr.com/eth_sepolia/${rpcKey}`;
+  }
 
   try {
     web3authInstance = new Web3Auth({
       clientId,
+      // Must match the network the project was created on in the Web3Auth dashboard
       web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
-      privateKeyProvider,
-      chainConfig,
+      chains: [chain],
+      defaultChainId: chain.chainId,
       uiConfig: {
         appName: "Trash2Token",
-        theme: "light",
+        mode: "light",
         loginMethodsOrder: ["google"],
-      },
-      loginConfig: {
-        google: {
-          verifier: "Trash2Token",
-          typeOfLogin: "google",
-          clientId: process.env.NEXT_PUBLIC_GOOGLE_CONSOLE_CLIENT_ID,
-        },
       },
     });
 
@@ -76,7 +60,7 @@ export const initWeb3Auth = async (): Promise<Web3Auth | null> => {
   }
 
   try {
-    await web3auth.initModal();
+    await web3auth.init();
     return web3auth;
   } catch (error) {
     console.error("Error initializing Web3Auth:", error);
