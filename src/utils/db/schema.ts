@@ -37,6 +37,7 @@ export const Reports = pgTable("reports", {
     .notNull()
     .default("Contact authorities"),
   imageUrl: text("image_url"),
+  imageData: text("image_data"),
   verificationResult: jsonb("verification_result"),
   status: varchar("status", { length: 255 }).notNull().default("pending"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

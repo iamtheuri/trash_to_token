@@ -52,8 +52,7 @@ export default function Sidebar({ open }) {
     <>
       {isLoggedIn ? (
         <aside
-          className={`bg-white border-r pt-20 border-gray-200 text-gray-800 w-64 fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 ease-in-out ${open ? "translate-x-0" : "-translate-x-full"
-            } lg:translate-x-0`}
+          className={`bg-white border-r pt-20 border-gray-200 text-gray-800 w-64 fixed inset-y-0 left-0 z-30 transform transition-transform duration-300 ease-in-out ${open ? "translate-x-0" : "-translate-x-full"}`}
         >
           <nav className="h-full flex flex-col justify-between">
             <div className="px-4 py-6 space-y-8">

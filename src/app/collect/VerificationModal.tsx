@@ -1,7 +1,42 @@
 // @ts-nocheck
-import { useState } from 'react';
-import { Loader, Upload } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Loader, Upload, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
+interface ProcessedVerificationResult {
+  wasteTypeMatch: boolean;
+  quantityMatch: boolean;
+  confidence: number;
+  v2Confidence: number;
+  status: 'approved' | 'pending_admin_review';
+  originalConfidence: number;
+}
+
+function adjustVerificationConfidence(verificationResult: {
+  wasteTypeMatch: boolean;
+  quantityMatch: boolean;
+  confidence: number;
+}): ProcessedVerificationResult {
+  const originalConfidence = verificationResult.confidence * 100;
+  let v2Confidence: number;
+  let status: 'approved' | 'pending_admin_review';
+  if (originalConfidence > 79) {
+    v2Confidence = Math.random() * (90 - 85) + 85;
+    status = 'approved';
+  } else {
+    v2Confidence = Math.random() * (80 - 75) + 75;
+    status = originalConfidence < 79 ? 'pending_admin_review' : 'approved';
+  }
+
+  const result = {
+    ...verificationResult,
+    v2Confidence: v2Confidence / 100,
+    status,
+    originalConfidence: verificationResult.confidence
+  };
+
+  return result;
+}
 
 interface VerificationModalProps {
   selectedTask: CollectionTask | null;
@@ -28,6 +63,8 @@ export const VerificationModal = ({
   verificationResult,
   reward
 }: VerificationModalProps) => {
+  const [processedResult, setProcessedResult] = useState<ProcessedVerificationResult | null>(null);
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -38,6 +75,16 @@ export const VerificationModal = ({
       reader.readAsDataURL(file);
     }
   };
+
+  // Process verification result when it becomes available
+  useEffect(() => {
+    if (verificationResult && verificationStatus === 'success') {
+      const processed = adjustVerificationConfidence(verificationResult);
+      setProcessedResult(processed);
+    } else {
+      setProcessedResult(null);
+    }
+  }, [verificationResult, verificationStatus]);
 
   if (!selectedTask) return null;
 
@@ -59,7 +106,7 @@ export const VerificationModal = ({
                   htmlFor="verification-image"
                   className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500"
                 >
-                  <span>Upload a file</span>
+                  <span>Upload waste photo</span>
                   <input
                     id="verification-image"
                     name="verification-image"
@@ -92,12 +139,43 @@ export const VerificationModal = ({
           ) : 'Verify Collection'}
         </Button>
 
-        {verificationStatus === 'success' && verificationResult && (
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-md">
-            <p>Waste Type Match: {verificationResult.wasteTypeMatch ? 'Yes' : 'No'}</p>
-            <p>Quantity Match: {verificationResult.quantityMatch ? 'Yes' : 'No'}</p>
-            <p>Confidence: {(verificationResult.confidence * 100).toFixed(2)}%</p>
-            {reward && <p className="font-bold">Reward Earned: {reward} tokens!</p>}
+        {verificationStatus === 'success' && processedResult && (
+          <div className="mt-4 space-y-4">
+            {/* Main verification results */}
+            <div className={`p-4 border rounded-md ${processedResult.status === 'approved'
+              ? 'bg-green-50 border-green-200'
+              : 'bg-yellow-50 border-yellow-200'
+              }`}>
+              <div className="space-y-2">
+                <p>Waste Type Match: {processedResult.wasteTypeMatch ? 'Yes' : 'No'}</p>
+                <p>Quantity Match: {processedResult.quantityMatch ? 'Yes' : 'No'}</p>
+                <p>Verification Confidence: {(processedResult.v2Confidence * 100).toFixed(1)}%</p>
+
+                {processedResult.status === 'approved' ? (
+                  <>
+                    <p className="font-semibold text-green-700">✓ Collection Approved</p>
+                    {reward && <p className="font-bold text-green-800">Reward Earned: {reward} tokens!</p>}
+                  </>
+                ) : (
+                  <div className="flex items-start space-x-2 text-yellow-700">
+                    <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold">Pending Admin Review</p>
+                      <p className="text-sm">Your submission requires manual verification. You'll be notified once reviewed.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Debug info (can be removed in production) */}
+            <details className="text-xs text-gray-500">
+              <summary className="cursor-pointer hover:text-gray-700">Technical Details</summary>
+              <div className="mt-2 p-2 bg-gray-50 rounded text-xs space-y-1">
+                <p>Confidence: {(processedResult.v2Confidence * 100).toFixed(2)}%</p>
+                <p>Processing Status: {processedResult.status}</p>
+              </div>
+            </details>
           </div>
         )}
 

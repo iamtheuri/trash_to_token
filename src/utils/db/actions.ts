@@ -118,6 +118,7 @@ export async function createReport(
   latitude: number,
   longitude: number,
   imageUrl?: string,
+  imageData?: string,
   verificationResult?: any
 ) {
   try {
@@ -131,10 +132,10 @@ export async function createReport(
         wasteType,
         amount,
         imageUrl,
+        imageData,
         verificationResult,
         status: "pending",
       })
-
       .returning()
       .execute();
 

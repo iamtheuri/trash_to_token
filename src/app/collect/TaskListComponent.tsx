@@ -149,6 +149,26 @@ export const TaskListComponent = ({
   }
 
   const isAdminOrAuthority = user?.role === 'Admin' || user?.role === 'Authority'
+  const isAdmin = user?.role === 'Admin'
+  const isReporter = user?.role === 'reporter'
+
+  // Helper function to determine if user can start collection
+  const canStartCollection = (task: CollectionTask) => {
+    return task.status === 'pending'
+  }
+
+  // Helper function to determine if user can complete and verify
+  const canCompleteAndVerify = (task: CollectionTask) => {
+    if (task.status !== 'in_progress') return false
+
+    // Admin can always complete and verify
+    if (isAdmin) return true
+
+    // Non-reporter users can complete and verify if they are the assigned collector
+    if (!isReporter && task.collectorId === user?.id) return true
+
+    return false
+  }
 
   return (
     <>
@@ -244,7 +264,8 @@ export const TaskListComponent = ({
               </div>
             </div>
             <div className="flex justify-end">
-              {task.status === 'pending' && (
+              {/* Pending status - show navigation and start collection buttons */}
+              {canStartCollection(task) && (
                 <>
                   <Button
                     onClick={() => navigateToTask(task)}
@@ -260,14 +281,24 @@ export const TaskListComponent = ({
                   </Button>
                 </>
               )}
-              {task.status === 'in_progress' && task.collectorId === user?.id && (
+
+              {/* In progress status - show complete and verify button based on role */}
+              {task.status === 'in_progress' && canCompleteAndVerify(task) && (
                 <Button onClick={() => setSelectedTask(task)} variant="outline" size="sm">
                   Complete & Verify
                 </Button>
               )}
-              {task.status === 'in_progress' && task.collectorId !== user?.id && (
-                <span className="text-yellow-600 text-sm font-medium">In progress by another collector</span>
+
+              {/* In progress but user cannot complete (not admin and either reporter or not assigned collector) */}
+              {task.status === 'in_progress' && !canCompleteAndVerify(task) && (
+                <span className="text-yellow-600 text-sm font-medium">
+                  {task.collectorId !== user?.id
+                    ? "In progress by another collector"
+                    : "Only admin can verify completion"}
+                </span>
               )}
+
+              {/* Verified status */}
               {task.status === 'verified' && (
                 <span className="text-green-600 text-sm font-medium">Reward Earned</span>
               )}

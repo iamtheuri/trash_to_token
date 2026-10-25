@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowImportingTsExtensions": true,
     "allowJs": true,
     "skipLibCheck": true,
@@ -11,7 +15,7 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "jsx": "preserve",
+    "jsx": "react-jsx",
     "incremental": true,
     "plugins": [
       {
@@ -19,8 +23,11 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
-    }
+      "@/*": [
+        "./src/*"
+      ]
+    },
+    "target": "ES2017"
   },
   "include": [
     "next-env.d.ts",
@@ -30,7 +37,13 @@
     "src/utils/db/schema.jsx",
     "src/utils/litProtocol.js",
     "src/hooks/useSessionSigs.js",
-    "src/scripts/createSchemas.js"
+    "src/scripts/createSchemas.js",
+    ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "src/components/DimoEcoScore.tsx",
+    "src/components/DimoVehicleData.tsx",
+    "src/components/createSchemas.tsx"
+  ]
 }

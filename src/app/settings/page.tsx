@@ -118,7 +118,7 @@ export default function SettingsPage() {
     // <div className="p-8 text-center text-red-500">
     //   {error}
     // </div>
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-3xl mx-auto">
       <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-lg font-medium text-gray-800 flex items-center">

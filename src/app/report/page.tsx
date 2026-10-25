@@ -1,7 +1,7 @@
 //@ts-nocheck
 "use client";
 import { useState, useCallback, useEffect } from "react";
-import { MapPin, Upload, CheckCircle, Loader } from "lucide-react";
+import { MapPin, Upload, CheckCircle, Loader, Trash, Scale, CalendarCheck, Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { StandaloneSearchBox, useJsApiLoader } from "@react-google-maps/api";
@@ -11,11 +11,19 @@ import {
   getUserByEmail,
   createReport,
   getRecentReports,
+  updateReportStatus,
 } from "@/utils/db/actions";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/hooks/use-toast";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useAuthStatus } from "@/lib/web3auth";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 
 const modelApiKey = process.env.NEXT_PUBLIC_MODEL_API_KEY;
@@ -384,8 +392,96 @@ export default function ReportPage() {
 
   const { isLoggedIn } = useAuthStatus(true);
 
+  const renderImagePreview = (report: any) => {
+    const imageSrc = report.imageData || report.imageUrl;
+
+    if (!imageSrc) {
+      return (
+        <div className="bg-gray-200 flex items-center justify-center w-16 h-16 rounded-lg">
+          <span className="text-gray-500 text-xs">No image</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="relative group">
+        <img
+          src={imageSrc}
+          alt={`Waste report ${report.id}`}
+          className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+          onError={(e) => {
+            console.error("Error loading image:", e);
+            (e.target as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      </div>
+    );
+  };
+
+  const renderModalImage = (report: any) => {
+    const imageSrc = report.imageData || report.imageUrl;
+
+    if (!imageSrc) {
+      return (
+        <div className="bg-gray-200 flex items-center justify-center h-full rounded-lg">
+          <span className="text-gray-500">No image available</span>
+        </div>
+      );
+    }
+
+    return (
+      <img
+        src={imageSrc}
+        alt={`Waste report ${report.id}`}
+        className="max-w-full max-h-[60vh] object-contain rounded-lg shadow-lg"
+        onError={(e) => {
+          console.error("Error loading image:", e);
+          (e.target as HTMLImageElement).style.display = 'none';
+        }}
+      />
+    );
+  };
+
+  const [updatingReports, setUpdatingReports] = useState<Set<number>>(new Set());
+
+  const handleVerifyReport = async (reportId: number) => {
+    setUpdatingReports(prev => new Set(prev).add(reportId));
+
+    try {
+      const updatedReport = await updateReportStatus(reportId, 'in_progress');
+
+      if (updatedReport) {
+        setReports(prevReports =>
+          prevReports.map(report =>
+            report.id === reportId
+              ? { ...report, status: 'in_progress' }
+              : report
+          )
+        );
+
+        toast({
+          title: "Success",
+          description: "Report status updated!",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to update report:", err);
+      toast({
+        title: "Error",
+        description: "Failed to update report status",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingReports(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(reportId);
+        return newSet;
+      });
+    }
+  };
+
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-8 max-w-6xl mx-auto">
       {isLoggedIn && isReporter ? (
         <>
           <h1 className="text-3xl font-semibold mb-6 text-gray-800">
@@ -610,36 +706,118 @@ export default function ReportPage() {
         Recent Reports
       </h2>
       <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-        <div className="max-h-96 overflow-y-auto">
+        <div className="overflow-y-auto">
           <table className="w-full">
             <thead className="bg-gray-50 sticky top-0">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Location
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                {user?.role === "admin" && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {reports.map((report) => (
-                <tr
-                  key={report.id}
-                  className="hover:bg-gray-50 transition-colors duration-200"
-                >
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <MapPin className="inline-block w-4 h-4 mr-2 text-green-500" />
-                    {report.location}
+              {reports.map((report: any) => (
+                <tr key={report.id} className="hover:bg-gray-50 transition-colors duration-200">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <button className="focus:outline-none">
+                          {renderImagePreview(report)}
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-5xl max-h-[80vh] flex">
+                        <div className="flex-1 p-4 flex items-center justify-center bg-gray-50 rounded-l-lg w-full h-full">
+                          {renderModalImage(report)}
+                        </div>
+                        <div className="w-96 flex-shrink-0 p-6 space-y-6 overflow-y-auto">
+                          <DialogHeader className="text-left">
+                            <DialogTitle>Report Details</DialogTitle>
+                          </DialogHeader>
+
+                          <div className="space-y-4">
+                            <div>
+                              <h3 className="text-black font-black text-lg flex items-center"><MapPin className="w-4 h-4 mr-2" />Location</h3>
+                              <p className="mt-1 text-gray-900">{report.location}</p>
+                            </div>
+                            <div>
+                              <h3 className="text-black font-black text-lg flex items-center"><Trash className="w-4 h-4 mr-2" /> Type</h3>
+                              <p className="mt-1 text-gray-900">{report.wasteType}</p>
+                            </div>
+                            <div>
+                              <h3 className="text-black font-black text-lg flex items-center"><Scale className="w-4 h-4 mr-2" />Amount</h3>
+                              <p className="mt-1 text-gray-900">{report.amount}</p>
+                            </div>
+                            <div>
+                              <h3 className="text-black font-black text-lg flex items-center"><CalendarCheck className="w-4 h-4 mr-2" />Date Reported</h3>
+                              <p className="mt-1 text-gray-900">{report.createdAt}</p>
+                            </div>
+                            <div>
+                              <h3 className="text-black font-black text-lg flex items-center"><Timer className="w-4 h-4 mr-2" />Status</h3>
+                              <div className="mt-1">
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${report.status === 'verified'
+                                  ? 'bg-green-100 text-green-800'
+                                  : report.status === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                  {report.status === 'verified' && <CheckCircle className="w-4 h-4 mr-2" />}
+                                  {report.status || 'pending'}
+                                </span>
+                              </div>
+                            </div>
+                            {user?.role === "Admin" && report.status === 'pending' && (
+                              <div className="pt-4 border-t border-gray-200">
+                                <Button
+                                  onClick={() => handleVerifyReport(report.id)}
+                                  disabled={updatingReports.has(report.id)}
+                                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                  {updatingReports.has(report.id) ? (
+                                    <>
+                                      <Loader className="animate-spin w-4 h-4 mr-2" />
+                                      Verifying...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="w-4 h-4 mr-2" />
+                                      Verify Report
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {report.wasteType}
+                    <span className="max-w-32 truncate inline-block my-auto" title={report.location}>
+                      <MapPin className="inline-block w-4 h-4 mr-2 text-green-500" />
+                      {report.location}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <span className="max-w-20 truncate inline-block" title={report.wasteType}>
+                      {report.wasteType}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${report.status === 'verified'
+                      ? 'bg-green-100 text-green-800'
+                      : report.status === 'pending'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-gray-100 text-gray-800'
+                      }`}>
+                      {report.status === 'verified' && <CheckCircle className="w-3 h-3 mr-1" />}
+                      {report.status || 'pending'}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {report.amount}
@@ -647,6 +825,36 @@ export default function ReportPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {report.createdAt}
                   </td>
+                  {user?.role === "admin" && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {report.status !== 'verified' ? (
+                        <Button
+                          onClick={() => handleVerifyReport(report.id)}
+                          disabled={updatingReports.has(report.id)}
+                          size="sm"
+                          variant="default"
+                          className="bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          {updatingReports.has(report.id) ? (
+                            <>
+                              <Loader className="animate-spin w-4 h-4 mr-2" />
+                              Verifying...
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Verify
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <div className="flex items-center text-green-600 text-sm font-medium">
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Verified
+                        </div>
+                      )}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
