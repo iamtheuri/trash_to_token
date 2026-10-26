@@ -33,8 +33,11 @@ export function getWeb3AuthInstance(): Web3Auth | null {
   try {
     web3authInstance = new Web3Auth({
       clientId,
-      // Must match the network the project was created on in the Web3Auth dashboard
-      web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
+      // Must match the network tier the Client ID's project was created on in the Web3Auth dashboard
+      web3AuthNetwork:
+        process.env.NODE_ENV === "production"
+          ? WEB3AUTH_NETWORK.SAPPHIRE_MAINNET
+          : WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
       chains: [chain],
       defaultChainId: chain.chainId,
       uiConfig: {
